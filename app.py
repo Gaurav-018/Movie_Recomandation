@@ -12,7 +12,7 @@ try:
         dbscan = pickle.load(f)
     
     # Attach the trained cluster labels directly to the dataframe
-    df['cluster'] = dbscan.labels_[cite: 1]
+    df['cluster'] = dbscan.labels_
 except Exception as e:
     print(f"Error loading files, utilizing fallback mock data: {e}")
     # Fallback mock data for demonstration if files aren't present yet
@@ -33,9 +33,9 @@ def get_recommendations(movie_title, top_n=5):
     movie_cluster = movie_row.iloc[0]['cluster']
     movie_id = movie_row.index[0]
     
-    # Handle noise (-1 by DBSCAN) or valid clusters[cite: 1]
-    if movie_cluster == -1:[cite: 1]
-        similar_movies = df[df['cluster'] != -1][cite: 1]
+    # Handle noise (-1 by DBSCAN) or valid clusters
+    if movie_cluster == -1:
+        similar_movies = df[df['cluster'] != -1]
     else:
         similar_movies = df[df['cluster'] == movie_cluster]
         
