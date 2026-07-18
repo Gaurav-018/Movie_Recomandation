@@ -6,22 +6,31 @@ import os
 
 app = Flask(__name__)
 
-# 1. Load your dataset and the trained DBSCAN model safely
+# 1. Load your complete dataset and the trained DBSCAN model safely
 try:
+    # Diagnostic helper to print your folder structure to Render's logs
     print("Files present in directory:", os.listdir('.'))
+    
+    # Reads every single movie title from your actual dataset
     df = pd.read_csv('movies_metadata.csv')
+    
     with open('model.pkl', 'rb') as f:
         dbscan = pickle.load(f)
     
     # Attach the trained cluster labels directly to the dataframe
     df['cluster'] = dbscan.labels_
+    
 except Exception as e:
-    print(f"File load failed, fallback mock data activated: {e}")
-    # Fallback dataset for local testing or immediate preview safety
+    print(f"CRITICAL: Could not find your dataset. Fallback active. Error: {e}")
+    # Fallback placeholder dataset with a few choices just in case the file path breaks
     df = pd.DataFrame({
-        'title': ['Inception', 'Interstellar', 'The Dark Knight', 'The Hangover', 'Superbad'],
-        'cluster': [0, 0, 0, 1, 1],
-        'imdb_score': [8.8, 8.6, 9.0, 7.7, 7.6]
+        'title': [
+            'Inception', 'Interstellar', 'The Dark Knight', 'The Hangover', 'Superbad',
+            'Avatar', 'Titanic', 'The Avengers', 'Gladiator', 'Pulp Fiction', 
+            'The Matrix', 'Fight Club', 'Forrest Gump', 'Spirited Away', 'Parasite'
+        ],
+        'cluster': [0, 0, 0, 1, 1, 0, 2, 0, 2, 3, 0, 3, 2, 4, 3],
+        'imdb_score': [8.8, 8.6, 9.0, 7.7, 7.6, 7.9, 7.9, 8.0, 8.5, 8.9, 8.7, 8.8, 8.8, 8.6, 8.5]
     })
 
 def get_recommendations(movie_title, top_n=5):
@@ -29,7 +38,7 @@ def get_recommendations(movie_title, top_n=5):
     movie_row = df[df['title'].str.lower() == movie_title.lower()]
     
     if movie_row.empty:
-        return None, "Movie not found in the database."
+        return None, "Movie not found in the database. Please select a valid movie from the dropdown list."
     
     # Get the cluster of the selected movie
     movie_cluster = movie_row.iloc[0]['cluster']
@@ -76,16 +85,17 @@ HTML_TEMPLATE = """
             <form action="/recommend" method="POST" class="space-y-6">
                 <div>
                     <label for="movie_title" class="block text-sm font-medium text-slate-300 mb-2">
-                        Type or Select a Movie
+                        Type or Select a Movie (Total Loaded: {{ movies|length }})
                     </label>
                     <input 
                         list="movie-options" 
                         id="movie_title" 
                         name="movie_title" 
-                        placeholder="e.g. Inception..." 
+                        placeholder="Type to search through ALL available movies..." 
                         value="{{ selected_movie if selected_movie else '' }}"
                         class="w-full bg-slate-950/80 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 placeholder-slate-500 transition-all"
                         required
+                        autocomplete="off"
                     >
                     <datalist id="movie-options">
                         {% for movie in movies %}
@@ -137,18 +147,18 @@ HTML_TEMPLATE = """
 </html>
 """
 
-# Dynamic route mapping to avoid 404 routing variations
 @app.route('/')
 @app.route('/index')
 @app.route('/home')
 def home():
-    movie_list = df['title'].dropna().unique().tolist()
+    # Extracts every unique movie title from the loaded CSV alphabetically
+    movie_list = sorted(df['title'].dropna().astype(str).unique().tolist())
     return render_template_string(HTML_TEMPLATE, movies=movie_list)
 
 @app.route('/recommend', methods=['POST'])
 def recommend():
     selected_movie = request.form.get('movie_title')
-    movie_list = df['title'].dropna().unique().tolist()
+    movie_list = sorted(df['title'].dropna().astype(str).unique().tolist())
     
     if not selected_movie:
         return render_template_string(HTML_TEMPLATE, error="Please select a movie.", movies=movie_list)
@@ -160,11 +170,6 @@ def recommend():
                                   selected_movie=selected_movie, 
                                   recommendations=recommendations, 
                                   error=error)
-
-# Custom visual debugging layers
-@app.errorhandler(404)
-def page_not_found(e):
-    return f"<div style='font-family:sans-serif;padding:40px;'><h2>App Status: Online</h2><p>Flask framework loaded correctly, but the address requested is incorrect. Context: {e}</p></div>", 404
 
 if __name__ == '__main__':
     app.run(debug=True)
