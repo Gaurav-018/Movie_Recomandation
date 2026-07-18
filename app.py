@@ -2,11 +2,13 @@ from flask import Flask, request, render_template_string
 import pickle
 import pandas as pd
 import numpy as np
+import os
 
 app = Flask(__name__)
 
-# 1. Load your dataset and the trained DBSCAN model
+# 1. Load your dataset and the trained DBSCAN model safely
 try:
+    print("Files present in directory:", os.listdir('.'))
     df = pd.read_csv('movies_metadata.csv')
     with open('model.pkl', 'rb') as f:
         dbscan = pickle.load(f)
@@ -14,8 +16,8 @@ try:
     # Attach the trained cluster labels directly to the dataframe
     df['cluster'] = dbscan.labels_
 except Exception as e:
-    print(f"Error loading files, utilizing fallback mock data: {e}")
-    # Fallback mock data for demonstration if files aren't present yet
+    print(f"File load failed, fallback mock data activated: {e}")
+    # Fallback dataset for local testing or immediate preview safety
     df = pd.DataFrame({
         'title': ['Inception', 'Interstellar', 'The Dark Knight', 'The Hangover', 'Superbad'],
         'cluster': [0, 0, 0, 1, 1],
@@ -48,7 +50,7 @@ def get_recommendations(movie_title, top_n=5):
     
     return similar_movies[['title', 'cluster']].head(top_n).to_dict(orient='records'), None
 
-# HTML/Tailwind CSS Frontend Blueprint
+# HTML/Tailwind CSS Frontend String Blueprint
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
@@ -135,7 +137,10 @@ HTML_TEMPLATE = """
 </html>
 """
 
+# Dynamic route mapping to avoid 404 routing variations
 @app.route('/')
+@app.route('/index')
+@app.route('/home')
 def home():
     movie_list = df['title'].dropna().unique().tolist()
     return render_template_string(HTML_TEMPLATE, movies=movie_list)
@@ -155,6 +160,11 @@ def recommend():
                                   selected_movie=selected_movie, 
                                   recommendations=recommendations, 
                                   error=error)
+
+# Custom visual debugging layers
+@app.errorhandler(404)
+def page_not_found(e):
+    return f"<div style='font-family:sans-serif;padding:40px;'><h2>App Status: Online</h2><p>Flask framework loaded correctly, but the address requested is incorrect. Context: {e}</p></div>", 404
 
 if __name__ == '__main__':
     app.run(debug=True)
